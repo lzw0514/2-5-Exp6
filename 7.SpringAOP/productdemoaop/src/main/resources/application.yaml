@@ -52,6 +52,15 @@ spring:
     #JSON的时间数据的时区
     time-zone: GMT+8
 
+  data:
+    redis:
+      repositories:
+        #forbid redis to scan repositories
+        enabled: false
+      host: redis
+      database: 0
+      password: 123456
+
 mybatis:
   #domain对象的包
   type-aliases-package: cn.edu.xmu.javaee.goodsdemo.mapper.po

@@ -28,7 +28,8 @@ public class CloneFactory {
         target = Product.builder().id(source.getId()).name(source.getName()).barcode(source.getBarcode()).originalPrice(source.getOriginalPrice()).originPlace(source.getOriginPlace())
                 .skuSn(source.getSkuSn()).weight(source.getWeight()).unit(source.getUnit()).commissionRatio(source.getCommissionRatio()).freeThreshold(source.getFreeThreshold())
                 .creator(User.builder().id(source.getCreatorId()).name(source.getCreatorName()).build()).
-                modifier(User.builder().id(source.getModifierId()).name(source.getModifierName()).build()).gmtCreate(source.getGmtCreate()).gmtModified(source.getGmtModified()).build();
+                modifier(User.builder().id(source.getModifierId()).name(source.getModifierName()).build()).gmtCreate(source.getGmtCreate()).gmtModified(source.getGmtModified()).GoodsId(source.getGoodsId())
+                .build();
         return target;
     }
 

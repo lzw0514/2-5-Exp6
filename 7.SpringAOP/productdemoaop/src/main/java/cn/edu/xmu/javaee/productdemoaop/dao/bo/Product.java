@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +21,7 @@ import java.util.stream.Collectors;
  **/
 @Data
 @NoArgsConstructor
-public class Product {
+public class Product implements Serializable {
 
     private static final Logger logger = LoggerFactory.getLogger(Product.class);
 
@@ -61,9 +62,11 @@ public class Product {
 
     private LocalDateTime gmtModified;
 
+    private Long GoodsId;
+
     @Builder
 
-    public Product(Long id, String skuSn, String name, Long originalPrice, Long weight, String barcode, String unit, String originPlace, Integer commissionRatio, Long freeThreshold, byte status, User creator, User modifier, LocalDateTime gmtCreate, LocalDateTime gmtModified) {
+    public Product(Long id, String skuSn, String name, Long originalPrice, Long weight, String barcode, String unit, String originPlace, Integer commissionRatio, Long freeThreshold, byte status, User creator, User modifier, LocalDateTime gmtCreate, LocalDateTime gmtModified,Long GoodsId) {
         this.id = id;
         this.skuSn = skuSn;
         this.name = name;
@@ -79,5 +82,7 @@ public class Product {
         this.modifier = modifier;
         this.gmtCreate = gmtCreate;
         this.gmtModified = gmtModified;
+        this.GoodsId=GoodsId;
     }
+
 }

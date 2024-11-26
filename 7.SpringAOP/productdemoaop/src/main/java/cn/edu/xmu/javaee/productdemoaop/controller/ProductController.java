@@ -41,7 +41,7 @@ public class ProductController {
         logger.debug("getProductById: id = {} " ,id);
         ReturnObject retObj = null;
         Product product = null;
-        if (null != type && "manual" == type){
+        if (null != type &&type.equals("manual") ){
             product = productService.findProductById_manual(id);
         } else {
             product = productService.retrieveProductByID(id, true);

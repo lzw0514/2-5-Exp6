@@ -1,6 +1,7 @@
 package cn.edu.xmu.javaee.productdemoaop.service;
 
 import cn.edu.xmu.javaee.core.exception.BusinessException;
+import cn.edu.xmu.javaee.core.util.RedisUtil;
 import cn.edu.xmu.javaee.productdemoaop.dao.ProductDao;
 import cn.edu.xmu.javaee.productdemoaop.dao.bo.Product;
 import cn.edu.xmu.javaee.productdemoaop.dao.bo.User;
@@ -19,10 +20,11 @@ public class ProductService {
 
 
     private ProductDao productDao;
-
+    private final RedisUtil redisUtil;
     @Autowired
-    public ProductService(ProductDao productDao) {
+    public ProductService(ProductDao productDao, RedisUtil redisUtil) {
         this.productDao = productDao;
+        this.redisUtil = redisUtil;
     }
 
     /**

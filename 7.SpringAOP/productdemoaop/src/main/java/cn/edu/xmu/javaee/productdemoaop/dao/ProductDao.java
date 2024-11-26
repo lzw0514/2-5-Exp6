@@ -3,6 +3,7 @@ package cn.edu.xmu.javaee.productdemoaop.dao;
 
 import cn.edu.xmu.javaee.core.exception.BusinessException;
 import cn.edu.xmu.javaee.core.model.ReturnNo;
+import cn.edu.xmu.javaee.core.util.RedisUtil;
 import cn.edu.xmu.javaee.productdemoaop.dao.OnSaleDao;
 import cn.edu.xmu.javaee.productdemoaop.dao.bo.OnSale;
 import cn.edu.xmu.javaee.productdemoaop.dao.bo.Product;
@@ -20,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Repository;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +34,7 @@ import java.util.stream.Collectors;
 public class ProductDao {
 
     private final static Logger logger = LoggerFactory.getLogger(ProductDao.class);
+    private final RedisUtil redisUtil;
 
     private ProductPoMapper productPoMapper;
 
@@ -39,11 +42,18 @@ public class ProductDao {
 
     private ProductAllMapper productAllMapper;
 
+    String productKey = "product:%d" ;
+    String onSaleKey = "onsale:%d";
+    String otherProductsKey = "other_products:%d";
+    String allproductKey="allproduct:%d";
+
+
     @Autowired
-    public ProductDao(ProductPoMapper productPoMapper, OnSaleDao onSaleDao, ProductAllMapper productAllMapper) {
+    public ProductDao(ProductPoMapper productPoMapper, OnSaleDao onSaleDao, ProductAllMapper productAllMapper, RedisUtil redisUtil) {
         this.productPoMapper = productPoMapper;
         this.onSaleDao = onSaleDao;
         this.productAllMapper = productAllMapper;
+        this.redisUtil = redisUtil;
     }
 
     /**
@@ -76,20 +86,60 @@ public class ProductDao {
      * @return  Goods对象列表，带关联的Product返回
      */
     public Product retrieveProductByID(Long productId, boolean all) throws BusinessException {
-        Product product = null;
-        ProductPo productPo = productPoMapper.selectByPrimaryKey(productId);
-        if (null == productPo){
-            throw new BusinessException(ReturnNo.RESOURCE_ID_NOTEXIST, "产品id不存在");
-        }
-        if (all) {
-            product = this.retrieveFullProduct(productPo);
-        } else {
-            product = CloneFactory.copy(new Product(), productPo);
-        }
 
-        logger.debug("retrieveProductByID: product = {}",  product);
+        String key = String.format(productKey,productId);
+        Product product = null;
+        if (redisUtil.hasKey(key)) {
+            logger.debug("Cache hit for key: {}", key);
+            // 从缓存中获取产品数据
+            product = (Product) redisUtil.get(key);
+            if (all)
+            {
+                product=populateOnSaleAndOtherProducts(product.getId(),product.getGoodsId(),product);
+            }
+        }
+        else {
+            logger.debug("Cache miss for key: {}", key);
+            //  如果 Redis 中没有，查询数据库
+            ProductPo productPo = productPoMapper.selectByPrimaryKey(productId);
+            if (productPo == null) {
+                throw new BusinessException(ReturnNo.RESOURCE_ID_NOTEXIST, "产品id不存在");
+            }
+            Product product1 = CloneFactory.copy(new Product(), productPo);
+            product =product1;
+
+            redisUtil.set(key, product1,-1);
+            if (all)
+            {
+                product=populateOnSaleAndOtherProducts(product1.getId(),product1.getGoodsId(),product);
+            }
+        }
+        logger.debug("retrieveProductByID: product = {}", product);
         return product;
     }
+
+private Product populateOnSaleAndOtherProducts(Long productId,Long GoodsId,Product product)
+{
+    String onSalekey = String.format(onSaleKey,productId);
+    String ontherProkey = String.format(otherProductsKey,productId);
+
+    // 补充 OnSale 数据
+    List<OnSale> latestOnSale= (List<OnSale>) redisUtil.get(onSalekey);
+    if (latestOnSale == null) {
+        latestOnSale = onSaleDao.getLatestOnSale(productId);
+        redisUtil.set(onSalekey, (Serializable) latestOnSale,-1); // 缓存 OnSale数据
+    }
+    product.setOnSaleList(latestOnSale);
+
+    // 补充other products数据
+    List<Product> otherProduct = (List<Product>) redisUtil.get(ontherProkey);
+    if (otherProduct == null) {
+        otherProduct=retrieveOtherProduct(GoodsId,productId);
+        redisUtil.set(ontherProkey, (Serializable) otherProduct,-1); // 缓存其他产品数据
+    }
+    product.setOtherProduct(otherProduct);
+    return  product;
+}
 
 
     private Product retrieveFullProduct(ProductPo productPo) throws DataAccessException{
@@ -111,6 +161,16 @@ public class ProductDao {
         ProductPoExample.Criteria criteria = example.createCriteria();
         criteria.andGoodsIdEqualTo(productPo.getGoodsId());
         criteria.andIdNotEqualTo(productPo.getId());
+        List<ProductPo> productPoList = productPoMapper.selectByExample(example);
+        return productPoList.stream().map(po->CloneFactory.copy(new Product(), po)).collect(Collectors.toList());
+    }
+
+    private List<Product> retrieveOtherProduct(Long GoodsId,Long productId) throws DataAccessException{
+
+        ProductPoExample example = new ProductPoExample();
+        ProductPoExample.Criteria criteria = example.createCriteria();
+        criteria.andGoodsIdEqualTo(GoodsId);
+        criteria.andIdNotEqualTo(productId);
         List<ProductPo> productPoList = productPoMapper.selectByExample(example);
         return productPoList.stream().map(po->CloneFactory.copy(new Product(), po)).collect(Collectors.toList());
     }
