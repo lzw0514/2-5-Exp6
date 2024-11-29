@@ -80,12 +80,31 @@ public class ProductDao {
         return productList;
     }
 
+
     /**
      * 用GoodsPo对象找Goods对象
      * @param  productId
      * @return  Goods对象列表，带关联的Product返回
      */
     public Product retrieveProductByID(Long productId, boolean all) throws BusinessException {
+        Product product = null;
+        ProductPo productPo = productPoMapper.selectByPrimaryKey(productId);
+        if (null == productPo){
+            throw new BusinessException(ReturnNo.RESOURCE_ID_NOTEXIST, "产品id不存在");
+        }
+        if (all) {
+            product = this.retrieveFullProduct(productPo);
+        } else {
+            product = CloneFactory.copy(new Product(), productPo);
+        }
+
+        logger.debug("retrieveProductByID: product = {}",  product);
+        return product;
+    }
+
+
+
+    public Product findProductByID(Long productId) throws BusinessException {
 
         String key = String.format(productKey,productId);
         Product product = null;
@@ -93,10 +112,6 @@ public class ProductDao {
             logger.debug("Cache hit for key: {}", key);
             // 从缓存中获取产品数据
             product = (Product) redisUtil.get(key);
-            if (all)
-            {
-                product=populateOnSaleAndOtherProducts(product.getId(),product.getGoodsId(),product);
-            }
         }
         else {
             logger.debug("Cache miss for key: {}", key);
@@ -107,39 +122,38 @@ public class ProductDao {
             }
             Product product1 = CloneFactory.copy(new Product(), productPo);
             product =product1;
-
             redisUtil.set(key, product1,-1);
-            if (all)
-            {
-                product=populateOnSaleAndOtherProducts(product1.getId(),product1.getGoodsId(),product);
-            }
         }
-        logger.debug("retrieveProductByID: product = {}", product);
+        logger.debug("findProductByID: product = {}", product);
         return product;
     }
 
-private Product populateOnSaleAndOtherProducts(Long productId,Long GoodsId,Product product)
-{
-    String onSalekey = String.format(onSaleKey,productId);
-    String ontherProkey = String.format(otherProductsKey,productId);
+    public List<OnSale> populateOnSale(Long productId) {
+             String onSalekey = String.format(onSaleKey,productId);
 
-    // 补充 OnSale 数据
-    List<OnSale> latestOnSale= (List<OnSale>) redisUtil.get(onSalekey);
-    if (latestOnSale == null) {
-        latestOnSale = onSaleDao.getLatestOnSale(productId);
-        redisUtil.set(onSalekey, (Serializable) latestOnSale,-1); // 缓存 OnSale数据
-    }
-    product.setOnSaleList(latestOnSale);
+             // 补充 OnSale 数据
+             List<OnSale> latestOnSale= (List<OnSale>) redisUtil.get(onSalekey);
+             if (latestOnSale == null) {
+                 latestOnSale = onSaleDao.getLatestOnSale(productId);
+                 redisUtil.set(onSalekey, (Serializable) latestOnSale,-1); // 缓存 OnSale数据
+             }
+             return latestOnSale;
 
-    // 补充other products数据
-    List<Product> otherProduct = (List<Product>) redisUtil.get(ontherProkey);
-    if (otherProduct == null) {
-        otherProduct=retrieveOtherProduct(GoodsId,productId);
-        redisUtil.set(ontherProkey, (Serializable) otherProduct,-1); // 缓存其他产品数据
     }
-    product.setOtherProduct(otherProduct);
-    return  product;
-}
+
+    public List<Product> populateOtherProducts(Product product,Long productId)
+    {
+
+        String ontherProkey = String.format(otherProductsKey,productId);
+
+        // 补充other products数据
+        List<Product> otherProduct = (List<Product>) redisUtil.get(ontherProkey);
+        if (otherProduct == null) {
+            otherProduct=retrieveOtherProduct(product.getGoodsId(),productId);
+            redisUtil.set(ontherProkey, (Serializable) otherProduct,-1); // 缓存其他产品数据
+        }
+        return  otherProduct;
+    }
 
 
     private Product retrieveFullProduct(ProductPo productPo) throws DataAccessException{
