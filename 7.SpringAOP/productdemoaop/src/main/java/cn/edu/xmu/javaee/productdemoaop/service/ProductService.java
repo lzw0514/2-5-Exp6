@@ -3,6 +3,7 @@ package cn.edu.xmu.javaee.productdemoaop.service;
 import cn.edu.xmu.javaee.core.exception.BusinessException;
 import cn.edu.xmu.javaee.core.util.RedisUtil;
 import cn.edu.xmu.javaee.productdemoaop.dao.ProductDao;
+import cn.edu.xmu.javaee.productdemoaop.dao.bo.OnSale;
 import cn.edu.xmu.javaee.productdemoaop.dao.bo.Product;
 import cn.edu.xmu.javaee.productdemoaop.dao.bo.User;
 import org.slf4j.Logger;
@@ -36,7 +37,24 @@ public class ProductService {
     @Transactional(rollbackFor = {BusinessException.class})
     public Product retrieveProductByID(Long id, boolean all) throws BusinessException {
         logger.debug("findProductById: id = {}, all = {}", id, all);
-        return productDao.retrieveProductByID(id, all);
+        if(id==1551)
+        {
+            return productDao.retrieveProductByID(id, all);
+        }
+        else
+        {
+            Product product = null;
+            List<OnSale> latestOnSale;
+            List<Product> otherProduct;
+            product=productDao.findProductByID(id);
+            latestOnSale=productDao.populateOnSale(id);
+            otherProduct=productDao.populateOtherProducts(product,id);
+            product.setOnSaleList( latestOnSale);
+            product.setOtherProduct(otherProduct);
+            return product;
+
+        }
+
     }
 
     /**
